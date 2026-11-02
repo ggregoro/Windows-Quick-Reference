@@ -70,6 +70,27 @@ Theme=auto
 `Theme` is `auto` (follow Windows' light or dark app mode), `dark` or
 `light`.
 
+`Mode` is `normal` (the default) or `nofocus`. The window also remembers
+where you last put it (`X`, `Y`).
+
+### No-focus mode
+
+Normally the Quick Reference window takes the keyboard while it's open, like
+any window. In an app that is driven by keyboard shortcuts (a radio
+automation program, a video editor, a game) or by a Stream Deck or macro pad
+that sends keys to it, those keys then go to Quick Reference instead.
+
+With `Mode=nofocus` the window never takes focus. It shows on top, but the
+app you're working in keeps the keyboard, so its shortcuts keep working
+while a sheet is on screen. In this mode:
+
+- pick a sheet by clicking it, scroll with the mouse wheel
+- there is no filter box (you can't type into the window)
+- `Win+Shift+K` shows and hides it; the window's close button also hides it
+- change the text size from the tray menu (**Bigger text** / **Smaller text**)
+
+Tip: park the window beside your app; it opens in the same place next time.
+
 `Hotkey` uses [AutoHotkey's notation](https://www.autohotkey.com/docs/v2/Hotkeys.htm):
 `#` Win, `+` Shift, `^` Ctrl, `!` Alt. `Folder` may use environment
 variables such as `%USERPROFILE%`. Choose **Reload** from the tray menu

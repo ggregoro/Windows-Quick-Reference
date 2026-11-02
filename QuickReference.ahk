@@ -21,7 +21,14 @@ Cfg := {
     Width:    Integer(IniRead(IniFile, "Settings", "Width", "1000")),
     Height:   Integer(IniRead(IniFile, "Settings", "Height", "650")),
     Theme:    StrLower(IniRead(IniFile, "Settings", "Theme", "auto")),   ; auto | dark | light
+    Mode:     StrLower(IniRead(IniFile, "Settings", "Mode", "normal")),  ; normal | nofocus
+    X:        IniRead(IniFile, "Settings", "X", ""),                     ; last window position
+    Y:        IniRead(IniFile, "Settings", "Y", ""),
 }
+; nofocus: the window never takes the keyboard, so the app you are working in
+; (and anything sending it keys, like a Stream Deck) keeps working while a
+; sheet is on screen. Pick sheets with the mouse, scroll with the wheel.
+NoFocus := (Cfg.Mode = "nofocus")
 if !FileExist(IniFile)
     WriteDefaultIni()
 if !DirExist(Cfg.Folder)
@@ -43,6 +50,14 @@ DocList := G.Add("ListBox", "w" ListWidth " r20")
 G.SetFont("s" Cfg.FontSize, Cfg.FontName)
 Viewer := G.Add("Edit", "x+10 ym w700 h600 ReadOnly Multi VScroll -WantReturn")
 
+if NoFocus {
+    G.Opt("+E0x08000000")             ; WS_EX_NOACTIVATE: clicks never activate it
+    G.Title := AppName " (no focus)"
+    FilterBox.Visible := false        ; nothing can be typed into it in this mode
+    DocList.Move(10, 10)
+    OnMessage(0x21, WM_MOUSEACTIVATE)
+}
+
 FilterBox.OnEvent("Change", (*) => RefreshList())
 DocList.OnEvent("Change", (*) => ShowSelected())
 DocList.OnEvent("DoubleClick", (*) => Viewer.Focus())
@@ -55,6 +70,8 @@ A_IconTip := AppName
 A_TrayMenu.Delete()
 A_TrayMenu.Add("Open " AppName, ToggleGui)
 A_TrayMenu.Add("Open sheets folder", (*) => Run('explorer.exe "' Cfg.Folder '"'))
+A_TrayMenu.Add("Bigger text", (*) => ChangeFont(1))
+A_TrayMenu.Add("Smaller text", (*) => ChangeFont(-1))
 A_TrayMenu.Add("Edit settings", (*) => Run('notepad.exe "' IniFile '"'))
 A_TrayMenu.Add()
 A_TrayMenu.Add("Reload", (*) => Reload())
@@ -84,7 +101,7 @@ GuiActive() => WinActive("ahk_id " G.Hwnd)
 ToggleGui(*) {
     global PrevHwnd
     if DllCall("IsWindowVisible", "Ptr", G.Hwnd) {
-        if GuiActive() {
+        if (NoFocus || GuiActive()) {
             HideGui()
         } else {
             WinActivate(G.Hwnd)       ; open but behind something: bring it forward
@@ -92,13 +109,20 @@ ToggleGui(*) {
         }
         return
     }
-    PrevHwnd := WinExist("A")
+    PrevHwnd := NoFocus ? 0 : WinExist("A")
     ApplyTheme()
     LoadDocs()
     FilterBox.Value := ""
     RefreshList()
-    G.Show("w" Cfg.Width " h" Cfg.Height)
-    FilterBox.Focus()
+    opts := "w" Cfg.Width " h" Cfg.Height
+    if OnScreen(Cfg.X, Cfg.Y)
+        opts .= " x" Cfg.X " y" Cfg.Y
+    if NoFocus {
+        G.Show(opts " NoActivate")
+    } else {
+        G.Show(opts)
+        FilterBox.Focus()
+    }
 }
 
 HideGui() {
@@ -107,6 +131,12 @@ HideGui() {
         Cfg.Width := w, Cfg.Height := h
         IniWrite(w, IniFile, "Settings", "Width")
         IniWrite(h, IniFile, "Settings", "Height")
+    }
+    G.GetPos(&x, &y)
+    if (x != Cfg.X || y != Cfg.Y) && x > -30000 {    ; -32000 = minimized
+        Cfg.X := x, Cfg.Y := y
+        IniWrite(x, IniFile, "Settings", "X")
+        IniWrite(y, IniFile, "Settings", "Y")
     }
     G.Hide()
     if (PrevHwnd && WinExist("ahk_id " PrevHwnd))
@@ -242,7 +272,28 @@ ApplyTheme() {
     DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", G.Hwnd, "Int", 20, "Int*", dark ? 1 : 0, "Int", 4)
 }
 
+; nofocus mode: answer "don't activate" to every click on our window or its
+; controls (MA_NOACTIVATE = 3: the click still reaches the control).
+WM_MOUSEACTIVATE(wParam, lParam, msg, hwnd) {
+    if (hwnd = G.Hwnd || DllCall("GetAncestor", "Ptr", hwnd, "UInt", 2, "Ptr") = G.Hwnd)
+        return 3
+}
+
+; True if x,y is on one of the monitors connected now (a saved position from
+; a monitor that has since been unplugged is ignored).
+OnScreen(x, y) {
+    if (x = "" || y = "" || !IsInteger(x) || !IsInteger(y))
+        return false
+    Loop MonitorGetCount() {
+        MonitorGetWorkArea(A_Index, &l, &t, &r, &b)
+        if (x + 50 >= l && x + 50 < r && y + 10 >= t && y + 10 < b)
+            return true
+    }
+    return false
+}
+
 WriteDefaultIni() {
+    IniWrite(Cfg.Mode, IniFile, "Settings", "Mode")
     IniWrite(Cfg.Theme, IniFile, "Settings", "Theme")
     IniWrite(Cfg.Folder, IniFile, "Settings", "Folder")
     IniWrite(Cfg.Hotkey, IniFile, "Settings", "Hotkey")
