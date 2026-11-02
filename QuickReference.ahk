@@ -29,8 +29,7 @@ Cfg := {
 ; (and anything sending it keys, like a Stream Deck) keeps working while a
 ; sheet is on screen. Pick sheets with the mouse, scroll with the wheel.
 NoFocus := (Cfg.Mode = "nofocus")
-if !FileExist(IniFile)
-    WriteDefaultIni()
+WriteMissingSettings()
 if !DirExist(Cfg.Folder)
     DirCreate(Cfg.Folder)
 
@@ -292,15 +291,13 @@ OnScreen(x, y) {
     return false
 }
 
-WriteDefaultIni() {
-    IniWrite(Cfg.Mode, IniFile, "Settings", "Mode")
-    IniWrite(Cfg.Theme, IniFile, "Settings", "Theme")
-    IniWrite(Cfg.Folder, IniFile, "Settings", "Folder")
-    IniWrite(Cfg.Hotkey, IniFile, "Settings", "Hotkey")
-    IniWrite(Cfg.FontName, IniFile, "Settings", "FontName")
-    IniWrite(Cfg.FontSize, IniFile, "Settings", "FontSize")
-    IniWrite(Cfg.Width, IniFile, "Settings", "Width")
-    IniWrite(Cfg.Height, IniFile, "Settings", "Height")
+; Write every setting that isn't in the ini yet (all of them on first run),
+; so settings added in a later version show up in an existing ini too.
+; Values already there are never touched.
+WriteMissingSettings() {
+    for key in ["Folder", "Hotkey", "Mode", "Theme", "FontName", "FontSize", "Width", "Height"]
+        if (IniRead(IniFile, "Settings", key, "@@missing@@") = "@@missing@@")
+            IniWrite(Cfg.%key%, IniFile, "Settings", key)
 }
 
 ExpandEnv(s) {
